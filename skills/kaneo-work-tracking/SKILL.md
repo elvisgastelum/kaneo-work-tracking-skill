@@ -83,8 +83,19 @@ Work for one ticket stays on one branch. When work spans several tickets, name t
 
 When a PR delivers work attached to a Kaneo ticket, mention the ticket:
 
-- Start the PR body with a ticket line: `Kaneo: FEX-2 — <ticket title>`. Add the ticket URL only when it is known, such as one the user shared; never construct one.
-- List every other ticket the PR touches on the same line or the next, by identifier.
+- Start the PR body with a ticket line that links the ticket's Kaneo page: `Kaneo: [FEX-2 — <ticket title>](<ticket URL>)`. A bare identifier without the link is not enough.
+- Link every other ticket the PR touches the same way, on the same line or the next.
+
+Build each ticket URL from values read from Kaneo, never from guesses:
+
+```text
+<base-url>/dashboard/workspace/<workspaceId>/project/<projectId>/task/<taskId>
+```
+
+- `<base-url>` is the `kaneo` MCP server URL without its trailing `/api/mcp`, such as `https://kaneo.example.com`.
+- `<workspaceId>`, `<projectId>`, and `<taskId>` are the task's IDs from `get_task` or `list_tasks` (`workspaceId` from the project when the task omits it), not the project slug or task number.
+
+A URL the user shared for the ticket works too. When the base URL or any ID cannot be read, stop and ask the user for the ticket URL instead of opening the PR with an unlinked ticket line.
 - Keep the PR title in the repository's usual style; when the repository has no title convention, prefix it with the identifier: `FEX-2: Add guest RSVP form`.
 - Derive the identifier from the branch name when it follows the convention above, and confirm it against Kaneo.
 
