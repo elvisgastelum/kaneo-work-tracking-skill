@@ -28,7 +28,7 @@ Re-run the same one-liner any time to update the installed skill and instruction
 
 - **Ticket identifier**: project slug plus task number, such as `FEX-2`.
 - **Branch**: `<IDENTIFIER>/<short-kebab-description>`, such as `FEX-2/some-feature-getting-done`, created from the up-to-date default branch.
-- **Pull request**: the body starts with `Kaneo: FEX-2 — <ticket title>`, and the PR URL is commented back on the Kaneo task.
+- **Pull request**: the body starts with a linked ticket line, `Kaneo: [FEX-2 — <ticket title>](<base-url>/dashboard/workspace/<workspaceId>/project/<projectId>/task/<taskId>)`, and the PR URL is commented back on the Kaneo task.
 - **Stories**: every agent-created story gets `made_by_agent` and one Fibonacci point label; anything `P8` or larger is split first.
 
 ## Options
