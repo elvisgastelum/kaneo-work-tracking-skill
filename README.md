@@ -8,9 +8,13 @@ A user-level [Claude Code](https://claude.com/claude-code) skill for working wit
 curl -fsSL https://raw.githubusercontent.com/elvisgastelum/kaneo-work-tracking-skill/main/install.sh | bash
 ```
 
-The installer asks for your Kaneo base URL, for example `https://kaneo.elvisgastelum.com/`, and registers `<base-url>/api/mcp` as the `kaneo` MCP server. It reads the answer from your terminal even when piped from `curl`. The prompt uses [`gum`](https://github.com/charmbracelet/gum), `whiptail`, or `dialog` when one is installed, and a plain prompt otherwise. Pressing Enter keeps the URL already configured.
+The installer asks for your Kaneo base URL, for example `https://kaneo.elvisgastelum.com/`, and registers `<base-url>/api/mcp` as the `kaneo` MCP server. It reads the answer from your terminal even when piped from `curl`. The prompt uses [`gum`](https://github.com/charmbracelet/gum), `whiptail`, or `dialog` when one is installed, and a plain prompt otherwise. It only asks when Kaneo is not configured yet; pressing Enter accepts the suggested URL.
 
-Restart Claude Code afterwards and run `/mcp` to check the Kaneo connection. The installer is idempotent: re-run the same command any time to resync with the repo. Files whose content already matches are left untouched and get no backup.
+Restart Claude Code afterwards and run `/mcp` to check the Kaneo connection.
+
+## Update
+
+Re-run the same one-liner any time to update the installed skill and instructions to the latest version. Re-runs are safe and quiet: once Kaneo is configured they keep its endpoint without asking again, files whose content already matches are left untouched, and `~/.claude.json` is not rewritten unless the Kaneo entry changes. To change the endpoint, pass `KANEO_URL=...` or `KANEO_RECONFIGURE=1` to be asked again.
 
 ## What it installs
 
@@ -32,6 +36,9 @@ Restart Claude Code afterwards and run `/mcp` to check the Kaneo connection. The
 ```bash
 # Non-interactive: pass the base URL instead of being asked
 curl -fsSL .../install.sh | KANEO_URL=https://kaneo.example.com bash
+
+# Ask for the base URL again on a machine that already has Kaneo configured
+curl -fsSL .../install.sh | KANEO_RECONFIGURE=1 bash
 
 # Force a prompt style: gum, whiptail, dialog, or plain
 curl -fsSL .../install.sh | KANEO_TUI=plain bash

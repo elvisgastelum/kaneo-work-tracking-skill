@@ -9,11 +9,15 @@
 #   CLAUDE_DIR=~/.claude   target Claude config directory
 #   CLAUDE_JSON=...        Claude Code user config holding MCP servers
 #                          (default ~/.claude.json, or $CLAUDE_DIR/.claude.json for a custom CLAUDE_DIR)
-#   KANEO_URL=https://...  Kaneo base URL; skips the prompt
+#   KANEO_URL=https://...  Kaneo base URL; skips the prompt and replaces the configured one
+#   KANEO_RECONFIGURE=1    ask for the base URL again even when Kaneo MCP is already configured
 #   KANEO_TUI=auto         prompt style: auto (gum, whiptail, dialog, then plain), gum, whiptail, dialog, plain
 #   REPO=owner/name        GitHub repo to download from
 #   REF=main               branch or tag to download from
 #   SKIP_MCP=1             do not register the Kaneo MCP server
+#
+# Re-running updates the skill and instructions and keeps the configured Kaneo MCP endpoint;
+# it only asks for the base URL when none is configured yet.
 #
 # Uninstall:
 #   curl -fsSL .../install.sh | bash -s -- --uninstall
@@ -175,9 +179,13 @@ resolve_base_url() { # prints the base URL to use, or nothing to skip MCP setup
     valid_base_url "$url" || die "invalid KANEO_URL: $KANEO_URL (expected https://host[/path])"
     printf '%s' "$url"; return
   fi
+  if [ -n "$current" ] && [ "${KANEO_RECONFIGURE:-0}" != "1" ]; then
+    normalize_base_url "$current"; return
+  fi
   if ! have_tty; then
     if [ -n "$current" ]; then
       warn "No terminal to prompt on; keeping the configured Kaneo MCP endpoint $current"
+      normalize_base_url "$current"
     else
       warn "No terminal to prompt on; skipped Kaneo MCP setup. Re-run with KANEO_URL=https://your-kaneo-host"
     fi
@@ -214,6 +222,12 @@ install_mcp() {
   base="$(resolve_base_url)"
   [ -n "$base" ] || return 0
   endpoint="$base/api/mcp"
+  # Leave the file alone when nothing changes: Claude Code rewrites it constantly, so a needless
+  # jq round-trip would only reformat it and pile up backups.
+  if [ "$(current_kaneo_url)" = "$endpoint" ] && [ "$(jq -r '.mcpServers.kaneo.type // empty' "$CLAUDE_JSON")" = http ]; then
+    info "Kaneo MCP server already set to $endpoint (KANEO_RECONFIGURE=1 to change it)"
+    return
+  fi
   mkdir -p "$(dirname "$CLAUDE_JSON")"
   [ -f "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"
   jq empty "$CLAUDE_JSON" 2>/dev/null || die "$CLAUDE_JSON is not valid JSON; fix it and re-run."
@@ -241,8 +255,15 @@ uninstall() {
 }
 
 install() {
-  info "Installing kaneo-work-tracking skill to $SKILL_DIR"
-  fetch skills/kaneo-work-tracking/SKILL.md "$SKILL_DIR/SKILL.md"
+  fetch skills/kaneo-work-tracking/SKILL.md "$TMP_DIR/SKILL.md"
+  mkdir -p "$SKILL_DIR"
+  # The skill is owned by this repo, so it is updated in place without a backup.
+  if [ -f "$SKILL_DIR/SKILL.md" ] && cmp -s "$TMP_DIR/SKILL.md" "$SKILL_DIR/SKILL.md"; then
+    info "$SKILL_DIR/SKILL.md already up to date"
+  else
+    cat "$TMP_DIR/SKILL.md" > "$SKILL_DIR/SKILL.md" || die "failed to write $SKILL_DIR/SKILL.md"
+    info "Installed kaneo-work-tracking skill to $SKILL_DIR"
+  fi
   sync_instructions
   install_mcp
   info "Done. Restart Claude Code to load the skill and the MCP server; run /mcp to check the Kaneo connection."

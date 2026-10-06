@@ -51,6 +51,20 @@ check "re-run makes no new backups" "[ \"\$(backups '$d')\" = '$n' ]"
 check "existing content and MCP servers are kept" "grep -qx 'keep me' '$d/CLAUDE.md' && [ \"\$(jq -r .mcpServers.other.url '$d/.claude.json')\" = https://x.test/mcp ] && [ \"\$(jq -r .numStartups '$d/.claude.json')\" = 3 ]"
 check "exactly one managed block" "[ \"\$(grep -c '$BEGIN_RE' '$d/CLAUDE.md')\" = 1 ]"
 
+# A config formatted unlike jq output is not rewritten when Kaneo is already current.
+d="$(fresh compact)"
+printf '{"a":1,"mcpServers":{"kaneo":{"type":"http","url":"%s/api/mcp"}}}' "$URL" > "$d/.claude.json"
+cp "$d/.claude.json" "$WORK/compact.json"
+run "$d"
+check "current Kaneo config is not reformatted" "cmp -s '$WORK/compact.json' '$d/.claude.json' && [ \"\$(backups '$d')\" = 0 ]"
+
+# Updating the skill replaces it in place without leaving backups in the skills directory.
+echo 'stale' > "$d/skills/kaneo-work-tracking/SKILL.md"
+run "$d"
+check "stale skill is updated" "cmp -s '$ROOT/skills/kaneo-work-tracking/SKILL.md' '$d/skills/kaneo-work-tracking/SKILL.md'"
+check "skill update leaves no backups" "[ \"\$(ls '$d/skills/kaneo-work-tracking')\" = SKILL.md ]"
+
+d="$WORK/rerun"
 # Without a terminal or KANEO_URL, the configured endpoint is kept.
 run "$d"
 check "no tty keeps the configured endpoint" "[ \"\$(cat '$d/CLAUDE.md' '$d/.claude.json' | cksum)\" = '$before' ]"
@@ -67,10 +81,21 @@ KANEO_TTY="$WORK/tty" KANEO_TUI=plain run "$d"
 check "prompted URL is registered" "[ \"\$(mcp_url '$d')\" = 'https://kaneo.prompted.test/api/mcp' ]"
 check "prompt is shown on the terminal" "grep -q 'Kaneo base URL' '$WORK/tty'"
 
-# An empty answer accepts the default, which is the configured base URL.
-printf '\n' > "$WORK/tty"
+# Re-running with a terminal updates silently: no prompt once Kaneo is configured.
+printf 'https://kaneo.other.test/\n' > "$WORK/tty"
 KANEO_TTY="$WORK/tty" KANEO_TUI=plain run "$d"
+check "re-run with a terminal does not prompt" "! grep -q 'Kaneo base URL' '$WORK/tty'"
+check "re-run with a terminal keeps the configured URL" "[ \"\$(mcp_url '$d')\" = 'https://kaneo.prompted.test/api/mcp' ]"
+
+# KANEO_RECONFIGURE asks again; an empty answer accepts the configured base URL as the default.
+printf '\n' > "$WORK/tty"
+KANEO_RECONFIGURE=1 KANEO_TTY="$WORK/tty" KANEO_TUI=plain run "$d"
+check "KANEO_RECONFIGURE prompts again" "grep -q 'Kaneo base URL' '$WORK/tty'"
 check "empty answer keeps the configured base URL" "[ \"\$(mcp_url '$d')\" = 'https://kaneo.prompted.test/api/mcp' ]"
+
+# KANEO_URL replaces the configured endpoint.
+KANEO_URL='https://kaneo.moved.test' run "$d"
+check "KANEO_URL replaces the configured endpoint" "[ \"\$(mcp_url '$d')\" = 'https://kaneo.moved.test/api/mcp' ]"
 
 # Repeated invalid answers stop the install.
 d="$(fresh badprompt)"
